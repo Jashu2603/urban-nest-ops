@@ -430,6 +430,7 @@
     payments:'<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5.5" width="15" height="10.5" rx="1.8"/><path d="M2.5 8.5h15"/><circle cx="13.5" cy="12" r="1" fill="currentColor" stroke="none"/></svg>',
     expenses:'<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 2.5h9l1 2v12l-2.2-1.3-2 1.3-2-1.3-2 1.3-2.2-1.3V4.5z"/><path d="M7.5 7.5h5M7.5 10.3h5M7.5 13h3"/></svg>',
     requests:'<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.3h3.1l1.3 2.2h5.2l1.3-2.2H17"/><path d="M3 11.3L5.1 4h9.8L17 11.3v4a1.5 1.5 0 01-1.5 1.5h-11A1.5 1.5 0 013 15.3z"/></svg>',
+    roomrequests:'<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="3.5" width="15" height="13" rx="1.5"/><path d="M2.5 8h15"/><path d="M7 3.5V8"/><path d="M6.5 12l2 2 3.5-3"/></svg>',
     pgmanagement:'<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="2.6" width="8.5" height="14.8" rx="1"/><path d="M6.3 5.8h2.9M6.3 8.6h2.9M6.3 11.4h2.9"/><path d="M12 8.2h2.8a1 1 0 011 1v6.2a1 1 0 01-1 1H12"/></svg>',
     bed:'<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.4 16V4.6"/><path d="M2.4 16v-2.5c0-1 .8-1.8 1.8-1.8h11.6c1 0 1.8.8 1.8 1.8V16"/><path d="M2.4 13.5h15.2"/><rect x="3.5" y="6.3" width="5.2" height="3.4" rx="0.8"/><path d="M10.6 9.7V7.5c0-.7.5-1.2 1.2-1.2h3c.7 0 1.2.5 1.2 1.2v2.2"/></svg>',
     rupee:'<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="10" cy="10" r="8"/><text x="10" y="13.6" font-size="9.5" font-weight="800" text-anchor="middle" fill="currentColor" stroke="none" font-family="Inter, sans-serif">₹</text></svg>',
@@ -632,7 +633,8 @@
     noticeperiod: {label:'Notice Period', title:'Notice Period', sub:'Track notice given, move-out dates, and policy compliance'},
     payments: {label:'Payments', title:'Payments', sub:'Log rent payments by cash or online, per resident'},
     expenses: {label:'Expenses', title:'Expenses', sub:'Salaries, utilities, supplies, and other outgoing costs'},
-    requests: {label:'Requests & Guests', title:'Requests & Guests', sub:'Guest visits, room requests, complaints, and reviews'},
+    requests: {label:'Guests & Feedback', title:'Guests & Feedback', sub:'Guest visits, complaints, and reviews'},
+    roomrequests: {label:'Room Requests', title:'Room Requests', sub:'Tenant requests to change room or building'},
     tasks: {label:'Tasks', title:'Tasks', sub:'Housekeeping, maintenance, and move-in/out tracking'},
     dailylog: {label:'Daily Log', title:'Daily Log', sub:'Track recurring duties like cleaning and the motor, day by day'},
     inventory: {label:'Inventory', title:'Inventory', sub:'Stock levels and reorder tracking'},
@@ -1606,7 +1608,6 @@
   function renderRequestsHub(){
     var segs = [
       {key:'guests', label:'Guests'},
-      {key:'roomRequests', label:'Room Requests'},
       {key:'complaints', label:'Complaints'},
       {key:'reviews', label:'Reviews'}
     ];
@@ -1615,8 +1616,7 @@
         return '<button class="toggle-btn '+(requestsSegment===s.key?'active':'')+'" onclick="UN.setRequestsSegment(\''+s.key+'\')">'+s.label+'</button>';
       }).join('') +
     '</div>';
-    var body = requestsSegment==='roomRequests' ? renderRoomRequests()
-      : requestsSegment==='complaints' ? renderComplaints()
+    var body = requestsSegment==='complaints' ? renderComplaints()
       : requestsSegment==='reviews' ? renderReviews()
       : renderGuests();
     return switcher + body;
@@ -2165,6 +2165,7 @@
     payments: renderPayments,
     expenses: renderExpenses,
     requests: renderRequestsHub,
+    roomrequests: renderRoomRequests,
     tasks: renderTasks,
     dailylog: renderDailyLog,
     inventory: renderInventory,
@@ -2185,7 +2186,7 @@
         '<div><div class="brand-name"><span class="urban">URBAN</span> <span class="nest">NEST</span></div><div class="brand-tagline">Ops Console</div></div>' +
       '</div>' +
       '<nav class="sidebar-nav">' +
-        ['dashboard','enquiries','bookings','residents','noticeperiod','payments','expenses','requests','tasks','dailylog','inventory','pgmanagement'].map(function(t){
+        ['dashboard','enquiries','bookings','residents','noticeperiod','payments','expenses','requests','roomrequests','tasks','dailylog','inventory','pgmanagement'].map(function(t){
           return '<button class="nav-item '+(activeTab===t?'active':'')+'" onclick="UN.setTab(\''+t+'\')">'+ICONS[t]+'<span>'+TAB_META[t].label+'</span></button>';
         }).join('') +
       '</nav>' +
