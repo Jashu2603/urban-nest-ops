@@ -329,6 +329,38 @@
   @media(max-width:460px){
     .kpi-grid{grid-template-columns:1fr;}
   }
+
+  /* ---------- dashboard split ---------- */
+  .dash-split{display:flex;gap:18px;align-items:flex-start;}
+  .dash-left{width:308px;flex-shrink:0;}
+  .dash-right{flex:1;min-width:0;}
+  @media(max-width:1060px){
+    .dash-split{flex-direction:column;}
+    .dash-left{width:100%;}
+    .dash-left .mini-card{position:static!important;}
+  }
+
+  /* ---------- room-request widget ---------- */
+  .rr-widget{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow);position:sticky;top:24px;}
+  .rr-widget h3{margin:0 0 4px;font-size:14.5px;font-weight:800;}
+  .rr-widget .rr-sub{font-size:12px;color:var(--muted);font-weight:600;margin-bottom:14px;}
+  .rr-widget .field{margin-bottom:11px;}
+  .rr-widget .field label{display:block;font-size:11.5px;font-weight:700;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.4px;}
+  .rr-widget .field input,.rr-widget .field select,.rr-widget .field textarea{
+    width:100%;font-family:'Inter',sans-serif;font-size:13px;padding:8px 10px;
+    border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--ink);
+  }
+  .rr-widget .field textarea{resize:vertical;min-height:62px;}
+  .rr-widget .field input:focus,.rr-widget .field select:focus,.rr-widget .field textarea:focus{outline:2px solid var(--navy);outline-offset:1px;}
+  .rr-success{padding:22px 0;text-align:center;}
+  .rr-success-icon{width:42px;height:42px;border-radius:50%;background:var(--success-bg);color:var(--success);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:800;margin:0 auto 10px;}
+  .rr-success-title{font-weight:800;color:var(--success);font-size:14px;margin-bottom:3px;}
+  .rr-success-sub{font-size:12px;color:var(--muted);font-weight:600;}
+  .rr-divider{border:none;border-top:1px solid var(--border);margin:14px 0;}
+  .rr-recent{}
+  .rr-recent-title{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;}
+  .rr-recent-row{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);font-size:12.5px;}
+  .rr-recent-row:last-child{border-bottom:none;}
 </style>
 </head>
 <body>
@@ -582,6 +614,11 @@
   var dashboardProperty = '';
   var requestsSegment = 'guests';
   var pgmgmtSegment = 'properties';
+  var dashRRResidentId = '';
+  var dashRRProperty = '';
+  var dashRRRoom = '';
+  var dashRRNotes = '';
+  var dashRRSuccess = false;
   var noticePropertyFilter = '';
   var roomExplorerProperty = null;
   var roomExplorerFloor = null;
@@ -686,6 +723,91 @@
     return '<div class="kpi-card">' +
       '<div class="kpi-icon '+accentClass+'">'+icon+'</div>' +
       '<div><div class="kpi-label">'+label+'</div><div class="kpi-value">'+value+'</div>'+(sub?'<div class="kpi-sub">'+sub+'</div>':'')+'</div>' +
+    '</div>';
+  }
+
+  // ---------- DASHBOARD ROOM-REQUEST WIDGET ----------
+  function renderRoomRequestWidget(){
+    var activeResidents = residents.filter(isActiveResident);
+    var propertyList = getPropertyList();
+
+    // Rooms available in the selected target property
+    var roomSet = {};
+    if(dashRRProperty){
+      activeResidents.forEach(function(r){
+        if(r.property === dashRRProperty && r.room) roomSet[r.room] = true;
+      });
+    } else {
+      activeResidents.forEach(function(r){ if(r.room) roomSet[r.room] = true; });
+    }
+    var roomOptions = Object.keys(roomSet).sort(function(a,b){ return a.localeCompare(b, undefined, {numeric:true}); });
+
+    // Recent requests (last 3) for current resident
+    var recentReqs = dashRRResidentId
+      ? roomRequests.filter(function(rq){ return rq.residentId === dashRRResidentId; })
+          .slice().sort(function(a,b){ return (b.requestDate||'').localeCompare(a.requestDate||''); })
+          .slice(0,3)
+      : [];
+
+    if(dashRRSuccess){
+      var recentHtml = recentReqs.length
+        ? '<hr class="rr-divider"><div class="rr-recent"><div class="rr-recent-title">Your recent requests</div>' +
+            recentReqs.map(function(rq){
+              return '<div class="rr-recent-row"><span>'+escapeHtml(rq.requestedRoom||'—')+(rq.requestedProperty?' · '+escapeHtml(rq.requestedProperty):'')+'</span><span class="status-pill status-'+slug(rq.status)+'">'+rq.status+'</span></div>';
+            }).join('') +
+          '</div>'
+        : '';
+      return '<div class="rr-widget">' +
+        '<h3>Room Change Request</h3>' +
+        '<div class="rr-success">' +
+          '<div class="rr-success-icon">✓</div>' +
+          '<div class="rr-success-title">Request submitted!</div>' +
+          '<div class="rr-success-sub">The management team will review it shortly.</div>' +
+        '</div>' +
+        recentHtml +
+        '<hr class="rr-divider">' +
+        '<button class="btn btn-ghost" style="width:100%;justify-content:center;" onclick="UN.dashRRReset()">Submit another request</button>' +
+      '</div>';
+    }
+
+    var residentOpts = '<option value="">— select your name —</option>' +
+      activeResidents.slice().sort(function(a,b){ return (a.name||'').localeCompare(b.name||''); }).map(function(r){
+        return '<option value="'+r.id+'" '+(r.id===dashRRResidentId?'selected':'')+'>'+escapeHtml(r.name)+(r.room?' ('+escapeHtml(r.room)+')':'')+'</option>';
+      }).join('');
+
+    var propertyOpts = '<option value="">— select building —</option>' +
+      propertyList.map(function(p){
+        return '<option value="'+escapeHtml(p)+'" '+(p===dashRRProperty?'selected':'')+'>'+escapeHtml(p)+'</option>';
+      }).join('');
+
+    var datalistHtml = roomOptions.map(function(r){ return '<option value="'+escapeHtml(r)+'"></option>'; }).join('');
+
+    var recentSectionHtml = recentReqs.length
+      ? '<hr class="rr-divider"><div class="rr-recent"><div class="rr-recent-title">Your recent requests</div>' +
+          recentReqs.map(function(rq){
+            return '<div class="rr-recent-row"><span>'+escapeHtml(rq.requestedRoom||'—')+(rq.requestedProperty?' · '+escapeHtml(rq.requestedProperty):'')+'</span><span class="status-pill status-'+slug(rq.status)+'">'+rq.status+'</span></div>';
+          }).join('') +
+        '</div>'
+      : '';
+
+    return '<div class="rr-widget">' +
+      '<h3>Room Change Request</h3>' +
+      '<div class="rr-sub">Select a room or building you\'d like to move to and submit your request to management.</div>' +
+      '<div class="field"><label>Your name</label>' +
+        '<select id="dashRR_resident" onchange="UN.dashRRSetResident(this.value)">'+residentOpts+'</select>' +
+      '</div>' +
+      '<div class="field"><label>Desired building</label>' +
+        '<select id="dashRR_property" onchange="UN.dashRRSetProperty(this.value)">'+propertyOpts+'</select>' +
+      '</div>' +
+      '<div class="field"><label>Desired room</label>' +
+        '<input id="dashRR_room" list="dashRRRoomList" value="'+escapeHtml(dashRRRoom)+'" placeholder="type or pick from list" oninput="UN.dashRRSetRoom(this.value)" />' +
+        '<datalist id="dashRRRoomList">'+datalistHtml+'</datalist>' +
+      '</div>' +
+      '<div class="field"><label>Preferences / notes</label>' +
+        '<textarea id="dashRR_notes" placeholder="Floor preference, roommate requirements, etc." oninput="UN.dashRRSetNotes(this.value)">'+escapeHtml(dashRRNotes)+'</textarea>' +
+      '</div>' +
+      '<button class="btn btn-primary" style="width:100%;justify-content:center;" onclick="UN.submitDashRoomRequest()">'+ICONS.requests+'Submit Request</button>' +
+      recentSectionHtml +
     '</div>';
   }
 
@@ -889,73 +1011,79 @@
         '</select>' +
       '</div>' : '';
 
+    var rightCol = '' +
+      renderBedBar(activeResidents, dashboardProperty) +
+      '<div class="panel-grid">' +
+        '<div class="mini-card"><h3>Rent overdue</h3>' +
+          (overdueList.length ? '<div style="margin-top:8px;">'+overdueList.map(function(r){
+            return '<div class="mini-row"><span>'+escapeHtml(r.name)+' · '+escapeHtml(r.room||'—')+'</span><strong style="color:var(--danger)">'+fmtMoney(r.rent)+'</strong></div>';
+          }).join('')+'</div>' : '<div class="mini-empty">Nothing overdue. Nice.</div>') +
+        '</div>' +
+        '<div class="mini-card"><h3>Notice period</h3>' +
+          (noticeList.length ? '<div class="panel-tag">'+noticeList.length+' on notice'+(noticeShortCount?(' · '+noticeShortCount+' short of policy'):'')+'</div>' +
+            noticeList.map(function(r){
+              return '<div class="mini-row"><span>'+escapeHtml(r.name)+' · '+escapeHtml(r.room||'—')+'</span><span>'+(r.moveOutDate||'no date set')+'</span></div>';
+            }).join('')
+          : '<div class="mini-empty">No one on notice right now.</div>') +
+        '</div>' +
+        '<div class="mini-card"><h3>Tasks coming up</h3>' +
+          (upcomingTasks.length ? '<div style="margin-top:8px;">'+upcomingTasks.map(function(t){
+            var d = daysUntil(t.dueDate);
+            var soon = d!==null && d<=3;
+            return '<div class="mini-row"><span>'+escapeHtml(t.title)+'</span><span class="'+(soon?'task-due-soon':'')+'">'+(t.dueDate||'no date')+'</span></div>';
+          }).join('')+'</div>' : '<div class="mini-empty">No open tasks. Add one from the Tasks tab.</div>') +
+        '</div>' +
+        '<div class="mini-card"><h3>Running low</h3>' +
+          '<div class="panel-tag">'+lowStock.length+' of '+inventory.length+' items low · '+fmtMoney(invValue)+' in stock</div>' +
+          (lowStock.length ? lowStock.map(function(i){
+            return '<div class="mini-row"><span>'+escapeHtml(i.name)+'</span><strong style="color:var(--danger)">'+i.qty+' '+escapeHtml(i.unit||'')+' left</strong></div>';
+          }).join('') : '<div class="mini-empty">Everything is stocked. Nice.</div>') +
+        '</div>' +
+        '<div class="mini-card"><h3>Duties today</h3>' +
+          (duties.length ?
+            '<div class="panel-tag">'+dutiesDoneToday.length+' of '+duties.length+' done today</div>' +
+            (dutiesPendingToday.length ? dutiesPendingToday.map(function(d){
+              return '<div class="mini-row"><span>'+escapeHtml(d.name)+'</span><span style="color:var(--warning);font-weight:700;">Pending</span></div>';
+            }).join('') : '<div class="mini-empty">All duties done today. Nice.</div>')
+          : '<div class="mini-empty">No duties set up yet — add some from the Daily Log tab.</div>') +
+        '</div>' +
+        '<div class="mini-card"><h3>Upcoming visits</h3>' +
+          (upcomingVisits.length ? upcomingVisits.map(function(e){
+            return '<div class="mini-row"><span>'+escapeHtml(e.name)+' · '+escapeHtml(e.source||'')+'</span><span>'+(e.visitDate||'no date')+'</span></div>';
+          }).join('') : '<div class="mini-empty">No visits scheduled. Log enquiries from the Enquiries tab.</div>') +
+        '</div>' +
+        '<div class="mini-card"><h3>Reserved bookings</h3>' +
+          (reservedBookings.length ? reservedBookings.map(function(b){
+            return '<div class="mini-row"><span>'+escapeHtml(b.name)+' · '+escapeHtml(b.room||'—')+'</span><span>'+(b.expectedMoveIn||'no date')+'</span></div>';
+          }).join('') : '<div class="mini-empty">No beds currently reserved. Log one from the Bookings tab.</div>') +
+        '</div>' +
+        '<div class="mini-card"><h3>Payments this month</h3>' +
+          '<div class="panel-tag">'+fmtMoney(paymentsThisMonth.total)+' across '+paymentsThisMonth.count+' payment'+(paymentsThisMonth.count===1?'':'s')+'</div>' +
+          (paymentsThisMonth.count ?
+            '<div class="mini-row"><span>Cash</span><strong>'+fmtMoney(paymentsThisMonth.cash)+'</strong></div>' +
+            '<div class="mini-row"><span>Online</span><strong>'+fmtMoney(paymentsThisMonth.online)+'</strong></div>'
+          : '<div class="mini-empty">No payments logged yet. Add one from the Payments tab.</div>') +
+        '</div>' +
+        '<div class="mini-card"><h3>Expenses</h3>' +
+          (expenses.length ?
+            '<div class="panel-tag">'+fmtMoney(expensesTotal)+' logged · '+(expensesNeedsReview.amount?('<span style="color:var(--warning);font-weight:700;">'+fmtMoney(expensesNeedsReview.amount)+' needs review</span>'):'all categorized')+'</div>' +
+            '<div class="mini-row"><span>Salaries + Utilities</span><strong>'+fmtMoney(expensesCore)+'</strong></div>'
+          : '<div class="mini-empty">No expenses logged yet. Add one from the Expenses tab.</div>') +
+        '</div>' +
+      '</div>';
+
     return '' +
-    propertySelector +
-    '<div class="kpi-grid">' +
-      kpiCard(ICONS.bed, 'icon-navy', 'Occupancy', occPct+'%', occupied+' of '+totalBeds+' beds occupied') +
-      kpiCard(ICONS.rupee, 'icon-success', 'Collected', fmtMoney(collected), 'rent received this cycle') +
-      kpiCard(ICONS.alert, 'icon-danger', 'Outstanding', fmtMoney(outstanding), 'Pending '+fmtMoney(pending)+' · Overdue '+fmtMoney(overdue)) +
-      kpiCard(ICONS.tasks, 'icon-warning', 'Open Tasks', openTasks.length, dueSoon.length+' due within 3 days') +
-    '</div>' +
-    renderBedBar(activeResidents, dashboardProperty) +
-    '<div class="panel-grid">' +
-      '<div class="mini-card"><h3>Rent overdue</h3>' +
-        (overdueList.length ? '<div style="margin-top:8px;">'+overdueList.map(function(r){
-          return '<div class="mini-row"><span>'+escapeHtml(r.name)+' · '+escapeHtml(r.room||'—')+'</span><strong style="color:var(--danger)">'+fmtMoney(r.rent)+'</strong></div>';
-        }).join('')+'</div>' : '<div class="mini-empty">Nothing overdue. Nice.</div>') +
+      propertySelector +
+      '<div class="kpi-grid">' +
+        kpiCard(ICONS.bed, 'icon-navy', 'Occupancy', occPct+'%', occupied+' of '+totalBeds+' beds occupied') +
+        kpiCard(ICONS.rupee, 'icon-success', 'Collected', fmtMoney(collected), 'rent received this cycle') +
+        kpiCard(ICONS.alert, 'icon-danger', 'Outstanding', fmtMoney(outstanding), 'Pending '+fmtMoney(pending)+' · Overdue '+fmtMoney(overdue)) +
+        kpiCard(ICONS.tasks, 'icon-warning', 'Open Tasks', openTasks.length, dueSoon.length+' due within 3 days') +
       '</div>' +
-      '<div class="mini-card"><h3>Notice period</h3>' +
-        (noticeList.length ? '<div class="panel-tag">'+noticeList.length+' on notice'+(noticeShortCount?(' · '+noticeShortCount+' short of policy'):'')+'</div>' +
-          noticeList.map(function(r){
-            return '<div class="mini-row"><span>'+escapeHtml(r.name)+' · '+escapeHtml(r.room||'—')+'</span><span>'+(r.moveOutDate||'no date set')+'</span></div>';
-          }).join('')
-        : '<div class="mini-empty">No one on notice right now.</div>') +
-      '</div>' +
-      '<div class="mini-card"><h3>Tasks coming up</h3>' +
-        (upcomingTasks.length ? '<div style="margin-top:8px;">'+upcomingTasks.map(function(t){
-          var d = daysUntil(t.dueDate);
-          var soon = d!==null && d<=3;
-          return '<div class="mini-row"><span>'+escapeHtml(t.title)+'</span><span class="'+(soon?'task-due-soon':'')+'">'+(t.dueDate||'no date')+'</span></div>';
-        }).join('')+'</div>' : '<div class="mini-empty">No open tasks. Add one from the Tasks tab.</div>') +
-      '</div>' +
-      '<div class="mini-card"><h3>Running low</h3>' +
-        '<div class="panel-tag">'+lowStock.length+' of '+inventory.length+' items low · '+fmtMoney(invValue)+' in stock</div>' +
-        (lowStock.length ? lowStock.map(function(i){
-          return '<div class="mini-row"><span>'+escapeHtml(i.name)+'</span><strong style="color:var(--danger)">'+i.qty+' '+escapeHtml(i.unit||'')+' left</strong></div>';
-        }).join('') : '<div class="mini-empty">Everything is stocked. Nice.</div>') +
-      '</div>' +
-      '<div class="mini-card"><h3>Duties today</h3>' +
-        (duties.length ?
-          '<div class="panel-tag">'+dutiesDoneToday.length+' of '+duties.length+' done today</div>' +
-          (dutiesPendingToday.length ? dutiesPendingToday.map(function(d){
-            return '<div class="mini-row"><span>'+escapeHtml(d.name)+'</span><span style="color:var(--warning);font-weight:700;">Pending</span></div>';
-          }).join('') : '<div class="mini-empty">All duties done today. Nice.</div>')
-        : '<div class="mini-empty">No duties set up yet — add some from the Daily Log tab.</div>') +
-      '</div>' +
-      '<div class="mini-card"><h3>Upcoming visits</h3>' +
-        (upcomingVisits.length ? upcomingVisits.map(function(e){
-          return '<div class="mini-row"><span>'+escapeHtml(e.name)+' · '+escapeHtml(e.source||'')+'</span><span>'+(e.visitDate||'no date')+'</span></div>';
-        }).join('') : '<div class="mini-empty">No visits scheduled. Log enquiries from the Enquiries tab.</div>') +
-      '</div>' +
-      '<div class="mini-card"><h3>Reserved bookings</h3>' +
-        (reservedBookings.length ? reservedBookings.map(function(b){
-          return '<div class="mini-row"><span>'+escapeHtml(b.name)+' · '+escapeHtml(b.room||'—')+'</span><span>'+(b.expectedMoveIn||'no date')+'</span></div>';
-        }).join('') : '<div class="mini-empty">No beds currently reserved. Log one from the Bookings tab.</div>') +
-      '</div>' +
-      '<div class="mini-card"><h3>Payments this month</h3>' +
-        '<div class="panel-tag">'+fmtMoney(paymentsThisMonth.total)+' across '+paymentsThisMonth.count+' payment'+(paymentsThisMonth.count===1?'':'s')+'</div>' +
-        (paymentsThisMonth.count ?
-          '<div class="mini-row"><span>Cash</span><strong>'+fmtMoney(paymentsThisMonth.cash)+'</strong></div>' +
-          '<div class="mini-row"><span>Online</span><strong>'+fmtMoney(paymentsThisMonth.online)+'</strong></div>'
-        : '<div class="mini-empty">No payments logged yet. Add one from the Payments tab.</div>') +
-      '</div>' +
-      '<div class="mini-card"><h3>Expenses</h3>' +
-        (expenses.length ?
-          '<div class="panel-tag">'+fmtMoney(expensesTotal)+' logged · '+(expensesNeedsReview.amount?('<span style="color:var(--warning);font-weight:700;">'+fmtMoney(expensesNeedsReview.amount)+' needs review</span>'):'all categorized')+'</div>' +
-          '<div class="mini-row"><span>Salaries + Utilities</span><strong>'+fmtMoney(expensesCore)+'</strong></div>'
-        : '<div class="mini-empty">No expenses logged yet. Add one from the Expenses tab.</div>') +
-      '</div>' +
-    '</div>';
+      '<div class="dash-split">' +
+        '<div class="dash-left">' + renderRoomRequestWidget() + '</div>' +
+        '<div class="dash-right">' + rightCol + '</div>' +
+      '</div>';
   }
 
   // ---------- ENQUIRIES ----------
@@ -1527,7 +1655,7 @@
       return '<tr>' +
         '<td>'+(rq.requestDate||'—')+'</td>' +
         '<td><div class="name-cell">'+escapeHtml(rq.residentName||'—')+'</div><div class="sub-cell">'+escapeHtml(rq.property||'')+'</div></td>' +
-        '<td>'+escapeHtml(rq.currentRoom||'—')+' → '+escapeHtml(rq.requestedRoom||'—')+'</td>' +
+        '<td>'+escapeHtml(rq.currentRoom||'—')+' → '+escapeHtml(rq.requestedRoom||'—')+(rq.requestedProperty&&rq.requestedProperty!==rq.property?'<div class="sub-cell">→ '+escapeHtml(rq.requestedProperty)+'</div>':'')+'</td>' +
         '<td class="sub-cell">'+escapeHtml(rq.reason||'—')+'</td>' +
         '<td>'+statusCell+'</td>' +
         actionsCell +
@@ -2820,7 +2948,67 @@
       if(ct){ ct.active = (value==='Active'); persist(); render(); }
     },
 
-    closeModal: closeModal
+    closeModal: closeModal,
+
+    // ---------- Dashboard room-request widget ----------
+    dashRRSetResident: function(id){
+      dashRRResidentId = id;
+      // auto-prefill building from resident's current property if none chosen yet
+      if(!dashRRProperty){
+        var r = residents.find(function(x){ return x.id===id; });
+        if(r && r.property) dashRRProperty = r.property;
+      }
+      render();
+    },
+    dashRRSetProperty: function(p){
+      dashRRProperty = p;
+      dashRRRoom = '';   // room options change, clear selection
+      render();
+    },
+    dashRRSetRoom: function(v){ dashRRRoom = v; },
+    dashRRSetNotes: function(v){ dashRRNotes = v; },
+    dashRRReset: function(){
+      dashRRResidentId = '';
+      dashRRProperty = '';
+      dashRRRoom = '';
+      dashRRNotes = '';
+      dashRRSuccess = false;
+      render();
+    },
+    submitDashRoomRequest: function(){
+      var residentObj = residents.find(function(x){ return x.id===dashRRResidentId; });
+      if(!residentObj){
+        var sel = document.getElementById('dashRR_resident');
+        if(sel) sel.focus();
+        return;
+      }
+      // read uncontrolled fields at submit time
+      var targetRoom = (document.getElementById('dashRR_room')||{}).value || dashRRRoom || '';
+      var targetNotes = (document.getElementById('dashRR_notes')||{}).value || dashRRNotes || '';
+      var targetProperty = dashRRProperty;
+      if(!targetRoom && !targetProperty){
+        var ri = document.getElementById('dashRR_room');
+        if(ri){ ri.style.outline='2px solid var(--danger)'; ri.focus(); setTimeout(function(){ if(ri) ri.style.outline=''; }, 1600); }
+        return;
+      }
+      roomRequests.push({
+        id: uid(),
+        residentId: dashRRResidentId,
+        residentName: residentObj.name,
+        currentRoom: residentObj.room || '',
+        property: residentObj.property || '',
+        requestedRoom: targetRoom || '—',
+        requestedProperty: targetProperty || '',
+        reason: targetNotes,
+        status: 'Requested',
+        requestDate: todayStr()
+      });
+      dashRRSuccess = true;
+      dashRRNotes = '';
+      dashRRRoom = '';
+      persist();
+      render();
+    }
   };
 
   document.addEventListener('keydown', function(e){
